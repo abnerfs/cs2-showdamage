@@ -1,7 +1,9 @@
 ﻿using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
+using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Entities;
+using CounterStrikeSharp.API.Modules.Utils;
 using System.Text;
 
 namespace ShowDamage
@@ -16,7 +18,7 @@ namespace ShowDamage
     {
         public override string ModuleName => "AbNeR ShowDamage";
 
-        public override string ModuleVersion => "1.0.0";
+        public override string ModuleVersion => "1.0.1";
 
         public override string ModuleAuthor => "AbNeR_CSS";
         
@@ -24,9 +26,24 @@ namespace ShowDamage
 
         Dictionary<int, DamageDone> damageDone = new();
 
+        ConVar? ffaEnabledConVar = null;
+
+        public bool FFAEnabled
+        {
+            get
+            {
+                if (ffaEnabledConVar is null)
+                    return false;
+
+                return ffaEnabledConVar.GetPrimitiveValue<bool>();
+            }
+        }
+
         public override void Load(bool hotReload)
         {
             Console.WriteLine("Showdamage loaded");
+            
+            ffaEnabledConVar = ConVar.Find("mp_teammates_are_enemies");
         }
 
         [GameEventHandler]
@@ -34,15 +51,19 @@ namespace ShowDamage
         {
             if (ev.Attacker is null ||
                 ev.Userid is null ||
-                ev.Attacker.TeamNum == ev.Userid.TeamNum)
+                !ev.Attacker.IsValid ||
+                (ev.Attacker.TeamNum == ev.Userid.TeamNum && !FFAEnabled))
                 return HookResult.Continue;
 
             int attackerUserId = ev.Attacker.UserId!.Value;
             if (damageDone.ContainsKey(attackerUserId))
             {
                 var dmg = damageDone[attackerUserId];
-                dmg.Health += ev.DmgHealth;
-                dmg.Armor += ev.DmgArmor;
+                if(dmg is not null)
+                {
+                    dmg.Health += ev.DmgHealth;
+                    dmg.Armor += ev.DmgArmor;
+                }
             }
             else
             {
